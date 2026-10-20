@@ -1,6 +1,6 @@
 # SimuLab
 
-Simulador de laboratorio de química para secundaria. Lo estoy haciendo por hobby, en ratos libres. Puedes echar reactivos en un vaso y ver reacciones, pH, temperatura, gases y precipitados.
+Simulador de laboratorio de química. Lo estoy haciendo por hobby, en ratos libres. Puedes echar reactivos en un vaso y ver reacciones, pH, temperatura, gases y precipitados.
 
 Todavía no es la versión final. Faltan reacciones, algunas están simplificadas y la interfaz va a cambiar. Por ahora está en español; la versión en inglés está pendiente.
 
