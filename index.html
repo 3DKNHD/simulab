@@ -3,7 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Aula Química — simulador de secundaria</title>
+<title>Aula Química — laboratorio virtual de secundaria</title>
+<meta name="description" content="Laboratorio de química virtual: echa reactivos reales en un vaso y observa reacciones, pH, temperatura, gases y precipitados calculados con cantidades reales.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,560;9..144,680&family=Outfit:wght@400;500;600&display=swap" rel="stylesheet">
@@ -11,7 +12,7 @@
 </head>
 <body>
 <header class="top">
-  <div class="brand">
+  <a class="brand" href="#inicio">
     <svg class="logo" viewBox="0 0 48 48" aria-hidden="true">
       <path d="M16 8h16M18 8c-4 8-8 14-8 22a14 14 0 0 0 28 0c0-8-4-14-8-22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
       <path d="M14 30h20" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" opacity=".7"/>
@@ -20,18 +21,27 @@
       <p class="eyebrow">Laboratorio virtual</p>
       <h1>Aula Química</h1>
     </div>
-  </div>
+  </a>
   <nav class="nav" aria-label="Secciones">
-    <button type="button" data-nav="inicio">Inicio</button>
-    <button type="button" data-nav="tabla">Vaso</button>
-    <button type="button" data-nav="experimentos">Experimentos</button>
-    <button type="button" data-nav="herramientas">Herramientas</button>
+    <a href="#inicio" data-nav="inicio">Inicio</a>
+    <a href="#laboratorio" data-nav="laboratorio">Laboratorio</a>
+    <a href="#practicas" data-nav="practicas">Prácticas</a>
+    <a href="#tabla" data-nav="tabla">Tabla periódica</a>
+    <a href="#herramientas" data-nav="herramientas">Herramientas</a>
   </nav>
 </header>
 <main id="app"></main>
-<script src="js/elements.js"></script>
-<script src="js/reactions.js"></script>
-<script src="js/experiments.js"></script>
-<script src="js/main.js"></script>
+<div id="toasts" aria-live="polite"></div>
+<script src="js/chem/elements.js"></script>
+<script src="js/chem/formula.js"></script>
+<script src="js/chem/catalog.js"></script>
+<script src="js/chem/engine.js"></script>
+<script src="js/ui/util.js"></script>
+<script src="js/ui/beaker.js"></script>
+<script src="js/ui/lab.js"></script>
+<script src="js/ui/table.js"></script>
+<script src="js/ui/practices.js"></script>
+<script src="js/ui/tools.js"></script>
+<script src="js/ui/main.js"></script>
 </body>
 </html>

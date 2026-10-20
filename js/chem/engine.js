@@ -138,7 +138,7 @@
     this.metalRate = {};
     this.metalGas = {};
     this.co2FromSolid = -1;
-    this.hist = { minPH: null, maxPH: null, maxT: 25, minT: 25, gas: {}, ppt: {}, tests: [], colors: {}, pours: [], indicatorSeen: {} };
+    this.hist = { minPH: null, maxPH: null, maxT: 25, minT: 25, gas: {}, ppt: {}, tests: [], colors: {}, pours: [], pourLog: [], indicatorSeen: {} };
     this.undo = [];
     this.cache = null;
   };
@@ -261,6 +261,7 @@
       this.susp[r.solid] = 0;
     }
     this.hist.pours.push(id);
+    this.hist.pourLog.push({ id: id, amount: amount, conc: conc == null ? r.defConc : conc, t: this.time });
     this.equilibrate();
     this.flushHeat();
     this.cache = null;
