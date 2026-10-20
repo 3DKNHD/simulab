@@ -3,16 +3,11 @@
   var state = {
     view: "inicio",
     symbol: "Na",
-    test: null,
     query: "",
     family: "todos",
     phase: "todos",
-    a: null,
-    b: null,
-    heated: false,
-    indicator: false,
-    mixed: false,
-    log: [],
+    beaker: [],
+    pourNote: "",
     exp: null,
     step: 0,
     quiz: null,
@@ -43,7 +38,7 @@
   }
 
   function stageHTML(v) {
-    if (!v) return '<div class="stage stage-empty">Elige una prueba para ver qué ocurre.</div>';
+    if (!v) return '<div class="stage stage-empty">El vaso está vacío.</div>';
     if (v.vessel === "burner") {
       return '<div class="stage"><div><div class="flame" style="background:' + esc(v.flame || "#ffb15a") + '"></div><div class="burner-base"></div></div><span class="caption">' + esc(v.caption || "Mechero") + "</span></div>";
     }
@@ -132,27 +127,54 @@
 
   function detailHTML() {
     var el = AQ.elementBySymbol(state.symbol) || AQ.ELEMENTS[10];
-    var test = state.test ? AQ.elementTest(el, state.test) : null;
     var valence = el.shells[el.shells.length - 1];
-    var outcome = test
-      ? stageHTML(test.visual) + '<div class="result"><h3>' + esc(test.title) + "</h3><p>" + esc(test.observation) + "</p><p>" + esc(test.explanation) + "</p>" + (test.equation ? '<p class="eq">' + esc(test.equation) + "</p>" : "") + (test.safety ? '<p class="banner danger">' + esc(test.safety) + "</p>" : "") + "</div>"
-      : '<div class="stage stage-empty">Prueba qué le pasa si lo calientas, lo mojas, lo dejas al aire o le añades ácido diluido.</div>';
-    return '<div class="panel detail"><div class="detail-copy"><div class="symbol-row"><div><p class="kicker">' + esc(el.category) + "</p><h2>" + esc(el.name) + '</h2></div><div class="formula">' + esc(el.symbol) + "</div></div>" +
+    return '<div class="panel"><div class="symbol-row"><div><p class="kicker">' + esc(el.category) + "</p><h2>" + esc(el.name) + '</h2></div><div class="formula">' + esc(el.symbol) + "</div></div>" +
       '<div class="facts"><div class="fact"><span>Número atómico</span><b>' + el.z + '</b></div><div class="fact"><span>Masa atómica</span><b>' + mass(el.mass) + '</b></div><div class="fact"><span>Grupo / periodo</span><b>' + el.group + " · " + el.period + '</b></div><div class="fact"><span>Estado a 25 °C</span><b>' + esc(el.state) + "</b></div></div>" +
       shellSVG(el) +
-      "<p class=\"muted\">Configuración: " + esc(el.config) + ". Electrones en la última capa dibujada: " + valence + ".</p>" +
-      "<p style=\"margin-top:8px\">" + esc(el.about) + "</p><p class=\"muted\" style=\"margin-top:6px\">" + esc(el.uses) + "</p></div><div>" +
-      '<div class="tests"><button type="button" class="btn ghost" data-act="test" data-test="calor">Calentar</button><button type="button" class="btn ghost" data-act="test" data-test="agua">Añadir agua</button><button type="button" class="btn ghost" data-act="test" data-test="aire">Dejar al aire</button><button type="button" class="btn ghost" data-act="test" data-test="acido">Ácido diluido</button></div>' +
-      outcome + "</div></div>";
+      "<p class=\"muted\">Configuración: " + esc(el.config) + ". Electrones en la última capa: " + valence + ".</p>" +
+      "<p style=\"margin-top:8px\">" + esc(el.about) + "</p><p class=\"muted\" style=\"margin-top:6px\">" + esc(el.uses) + "</p></div>";
+  }
+
+  function beakerHTML() {
+    var res = AQ.observeBeaker(state.beaker);
+    var chips = state.beaker.length
+      ? '<div class="poured">' + state.beaker.map(function (token, index) {
+        return '<button type="button" data-act="unpour" data-i="' + index + '">' + esc(AQ.pieceName(token)) + " · quitar</button>";
+      }).join("") + "</div>"
+      : '<p class="muted">Todavía no has echado nada.</p>';
+    var tray = AQ.TRAY.map(function (group) {
+      return "<h3 style=\"margin:12px 0 6px\">" + group.title + "</h3><div class=\"shelf\">" + group.ids.map(function (id) {
+        var reagent = AQ.REAGENTS[id];
+        var on = state.beaker.indexOf(id) >= 0;
+        return '<button type="button" class="bottle' + (on ? " is-on" : "") + '" data-act="pour" data-id="' + id + '"><i class="bottle-liquid" style="background:' + reagent.color + '"></i><span><b>' + esc(reagent.name) + "</b><small>" + esc(reagent.formula) + "</small></span></button>";
+      }).join("") + "</div>";
+    }).join("");
+    var dropOn = state.beaker.indexOf("feno") >= 0;
+    var selected = AQ.elementBySymbol(state.symbol);
+    var alreadyIn = selected && state.beaker.indexOf(selected.symbol) >= 0;
+    return '<div class="panel"><div class="row"><button type="button" class="btn" data-act="pour-selected"' + (alreadyIn ? " disabled" : "") + ">" + (alreadyIn ? "Ya está en el vaso" : "Echar " + esc(selected.name.toLowerCase()) + " al vaso") + "</button></div><h2>Vaso</h2><p class=\"muted\">Primero el elemento. Después echa otro, o algo de la bandeja.</p>" +
+      chips +
+      (state.pourNote ? '<p class="muted">' + esc(state.pourNote) + "</p>" : "") +
+      stageHTML(res.visual) +
+      '<div class="result"><p class="kicker">' + esc(res.type) + "</p><h3>" + esc(res.title) + "</h3><p>" + esc(res.observation) + "</p><p>" + esc(res.explanation) + "</p>" +
+      (res.equation ? '<p class="eq">' + esc(res.equation) + "</p>" : "") +
+      (res.conserve ? "<p class=\"muted\">" + esc(res.conserve) + "</p>" : "") +
+      (res.safety ? '<p class="banner danger">' + esc(res.safety) + "</p>" : "") +
+      (res.ph != null ? "<p>pH aproximado: <b>" + Number(res.ph).toLocaleString("es", { maximumFractionDigits: 1 }) + "</b></p>" : "") +
+      "</div>" +
+      '<details style="margin-top:8px"><summary>Serie de actividad simplificada</summary><p class="series">K &gt; Na &gt; Ca &gt; Mg &gt; Al &gt; Zn &gt; Fe &gt; H &gt; Cu &gt; Ag. Un metal desplaza a los que están debajo. Los que están encima del hidrógeno sueltan H₂ si echas ácido diluido.</p></details>' +
+      '<div class="row"><button type="button" class="btn secondary" data-act="empty-beaker"' + (state.beaker.length ? "" : " disabled") + ">Vaciar vaso</button></div>" +
+      "<h3 style=\"margin-top:16px\">Echar otra cosa</h3><p class=\"muted\">También puedes volver a la tabla y echar otro elemento.</p>" +
+      tray +
+      '<div class="shelf" style="margin-top:8px"><button type="button" class="bottle' + (dropOn ? " is-on" : "") + '" data-act="pour" data-id="feno"><i class="bottle-liquid" style="background:' + AQ.DROPS.color + '"></i><span><b>' + AQ.DROPS.name + "</b><small>" + AQ.DROPS.formula + "</small></span></button></div></div>";
   }
 
   function inicioHTML() {
-    return '<p class="kicker">Secundaria</p><h2 style="font-size:42px;margin:4px 0 8px">Prueba elementos y mira qué les pasa</h2><p class="lead">Un laboratorio de pizarra: la tabla hasta el kriptón, un mezclador de reacciones escolares y diez experimentos con ecuación, observación y una pregunta.</p>' +
+    return '<p class="kicker">Secundaria</p><h2 style="font-size:42px;margin:4px 0 8px">Echa un elemento al vaso</h2><p class="lead">Elige un elemento de la tabla, échalo al vaso y después añade otros elementos o lo que hay en la bandeja. El vaso muestra lo que ocurre, sin botones de calentar ni de ensayos fijos.</p>' +
       '<div class="cards">' +
-      card("tabla", "01", "Tabla", "Ficha, capas electrónicas y cuatro ensayos por elemento.") +
-      card("mezcla", "02", "Mezclador", "Junta dos sustancias de estantería y observa si hay reacción.") +
-      card("experimentos", "03", "Experimentos", "Guiones de clase: gases, sales, llama, masa y electrólisis.") +
-      card("herramientas", "04", "Herramientas", "pH de una neutralización y cambios de estado.") +
+      card("tabla", "01", "Vaso", "Selecciona un elemento, échalo y sigue añadiendo cosas a mano.") +
+      card("experimentos", "02", "Experimentos", "Guiones de clase: gases, sales, llama, masa y electrólisis.") +
+      card("herramientas", "03", "Herramientas", "pH de una neutralización, estados y colores de la llama.") +
       "</div>" +
       '<p class="banner">Simulación para estudiar. No sustituye a un docente ni a las normas del laboratorio. No indica cómo preparar sustancias peligrosas.</p>';
   }
@@ -162,48 +184,16 @@
   }
 
   function tablaHTML() {
-    return '<div class="stack"><div class="panel"><div class="toolbar"><input class="search" id="buscar" placeholder="Busca por nombre, símbolo o número" value="' + esc(state.query) + '">' +
+    return '<div class="work"><div class="panel"><div class="toolbar"><input class="search" id="buscar" placeholder="Busca por nombre, símbolo o número" value="' + esc(state.query) + '">' +
       chip("family", "todos", "Todos") + chip("family", "metal", "Metales") + chip("family", "no-metal", "No metales") + chip("family", "metaloide", "Metaloides") + chip("family", "noble", "Gases nobles") +
       chip("phase", "todos", "Cualquier estado") + chip("phase", "sólido", "Sólidos") + chip("phase", "líquido", "Líquidos") + chip("phase", "gas", "Gases") +
-      '</div><div id="tabla">' + tableHTML() + '</div><p class="muted" style="margin-top:8px">Periodos 1 a 4, del hidrógeno al kriptón. Es el tramo con el que se trabaja en secundaria.</p></div>' + detailHTML() + "</div>";
+      '</div><div id="tabla">' + tableHTML() + '</div><p class="muted" style="margin-top:8px">Toca un elemento y échalo al vaso. Luego echa otro, o algo de la bandeja.</p></div>' +
+      '<div class="work-side">' + beakerHTML() + detailHTML() + "</div></div>";
   }
 
   function chip(kind, value, label) {
     var on = state[kind] === value;
     return '<button type="button" class="chip' + (on ? " is-on" : "") + '" data-act="chip" data-kind="' + kind + '" data-value="' + value + '">' + label + "</button>";
-  }
-
-  function slot(id, label) {
-    var r = id ? AQ.REAGENTS[id] : null;
-    return '<div class="slot"><span class="kicker">' + label + "</span>" + (r ? "<b>" + esc(r.name) + "</b><div class=\"muted\">" + esc(r.formula) + '</div><button type="button" class="btn ghost" data-act="clear" data-slot="' + (label === "A" ? "a" : "b") + '">Quitar</button>' : '<div class="muted">Vacío</div>') + "</div>";
-  }
-
-  function mezclaHTML() {
-    var res = state.mixed || state.a || state.b ? AQ.mix(state.mixed ? state.a : null, state.mixed ? state.b : null, state.heated, state.indicator) : AQ.mix(null, null, false, false);
-    if (!state.mixed && (state.a || state.b)) {
-      res = {
-        title: "Listo para mezclar",
-        observation: "Has elegido " + [state.a, state.b].filter(Boolean).map(function (id) { return AQ.REAGENTS[id].name; }).join(" y ") + ".",
-        explanation: "Pulsa Mezclar para ver el resultado. Calentar y la fenolftaleína se aplican en ese momento.",
-        equation: "",
-        type: "En espera",
-        ph: null,
-        visual: { vessel: "beaker", liquid: "#d5e6ef", level: 0.35 },
-        conserve: ""
-      };
-    }
-    var shelf = AQ.SHELF.map(function (group) {
-      return "<h3 style=\"margin:12px 0 6px\">" + group.title + "</h3><div class=\"shelf\">" + group.ids.map(function (id) {
-        var r = AQ.REAGENTS[id];
-        var on = state.a === id || state.b === id;
-        return '<button type="button" class="bottle' + (on ? " is-on" : "") + '" data-act="reagent" data-id="' + id + '"><i class="bottle-liquid" style="background:' + r.color + '"></i><span><b>' + esc(r.name) + "</b><small>" + esc(r.formula) + "</small></span></button>";
-      }).join("") + "</div>";
-    }).join("");
-    return '<div class="layout"><div class="panel"><h2>Estantería</h2><p class="muted">Elige hasta dos sustancias.</p>' + shelf + '</div><div class="panel"><h2>Vaso</h2><div class="slots">' + slot(state.a, "A") + slot(state.b, "B") + '</div><div class="row"><button type="button" class="btn" data-act="mix"' + ((state.a || state.b) ? "" : " disabled") + '>Mezclar</button><button type="button" class="btn ghost' + (state.heated ? " is-on" : "") + '" data-act="heat">' + (state.heated ? "Mechero encendido" : "Calentar") + '</button><button type="button" class="btn ghost' + (state.indicator ? " is-on" : "") + '" data-act="indicator">' + (state.indicator ? "Fenolftaleína: sí" : "Fenolftaleína") + '</button><button type="button" class="btn secondary" data-act="empty">Vaciar</button></div>' +
-      stageHTML(res.visual) + '<div class="result"><p class="kicker">' + esc(res.type) + "</p><h3>" + esc(res.title) + "</h3><p>" + esc(res.observation) + "</p><p>" + esc(res.explanation) + "</p>" + (res.equation ? '<p class="eq">' + esc(res.equation) + "</p>" : "") + (res.conserve ? "<p class=\"muted\">" + esc(res.conserve) + "</p>" : "") + (res.ph != null ? "<p>pH aproximado: <b>" + Number(res.ph).toLocaleString("es", { maximumFractionDigits: 1 }) + "</b></p>" : "") + "</div>" +
-      '<details style="margin-top:10px"><summary>Serie de actividad simplificada</summary><p class="series">K &gt; Na &gt; Ca &gt; Mg &gt; Al &gt; Zn &gt; Fe &gt; H &gt; Cu &gt; Ag. Un metal desplaza a los que están debajo. Solo los que están encima del hidrógeno sueltan H₂ con ácidos diluidos.</p></details>' +
-      (state.log.length ? "<ul class=\"log\">" + state.log.map(function (line) { return "<li>" + esc(line) + "</li>"; }).join("") + "</ul>" : "") +
-      "</div></div>";
   }
 
   function expList() {
@@ -299,12 +289,24 @@
     return stageHTML({ vessel: "burner", flame: salt.color, caption: salt.name }) + "<p>" + esc(salt.formula) + ". " + esc(salt.tip) + "</p>";
   }
 
+  function pourInto(token) {
+    if (state.beaker.indexOf(token) >= 0) {
+      state.pourNote = "Eso ya está en el vaso.";
+      return;
+    }
+    if (state.beaker.length >= 4) {
+      state.pourNote = "El vaso admite cuatro cosas. Quita una para echar otra.";
+      return;
+    }
+    state.beaker.push(token);
+    state.pourNote = "";
+  }
+
   function render() {
     var root = document.getElementById("app");
     var html = "";
     if (state.view === "inicio") html = inicioHTML();
     else if (state.view === "tabla") html = tablaHTML();
-    else if (state.view === "mezcla") html = mezclaHTML();
     else if (state.view === "experimentos") html = state.exp ? expPlayer() : expList();
     else html = toolsHTML();
     root.innerHTML = html;
@@ -329,31 +331,14 @@
     if (!el) return;
     var act = el.dataset.act;
     if (act === "view") state.view = el.dataset.view;
-    else if (act === "element") {
-      state.symbol = el.dataset.symbol;
-      state.test = null;
-    } else if (act === "test") state.test = el.dataset.test;
-    else if (act === "chip") {
-      state[el.dataset.kind] = el.dataset.value;
-    } else if (act === "reagent") {
-      var id = el.dataset.id;
-      state.mixed = false;
-      if (state.a === id) { state.a = state.b; state.b = null; }
-      else if (state.b === id) state.b = null;
-      else if (!state.a) state.a = id;
-      else state.b = id;
-    } else if (act === "clear") {
-      state[el.dataset.slot] = null;
-      state.mixed = false;
-    } else if (act === "mix") {
-      state.mixed = true;
-      var names = [state.a, state.b].filter(Boolean).map(function (id) { return AQ.REAGENTS[id].name; }).join(" + ");
-      state.log.unshift(names || "vaso vacío");
-      state.log = state.log.slice(0, 6);
-    } else if (act === "heat") state.heated = !state.heated;
-    else if (act === "indicator") state.indicator = !state.indicator;
-    else if (act === "empty") {
-      state.a = null; state.b = null; state.mixed = false; state.heated = false; state.indicator = false;
+    else if (act === "element") state.symbol = el.dataset.symbol;
+    else if (act === "chip") state[el.dataset.kind] = el.dataset.value;
+    else if (act === "pour-selected") pourInto(state.symbol);
+    else if (act === "pour") pourInto(el.dataset.id);
+    else if (act === "unpour") state.beaker.splice(Number(el.dataset.i), 1);
+    else if (act === "empty-beaker") {
+      state.beaker = [];
+      state.pourNote = "";
     } else if (act === "experiment") {
       state.exp = el.dataset.id; state.step = 0; state.quiz = null;
     } else if (act === "exp-back") state.exp = null;
