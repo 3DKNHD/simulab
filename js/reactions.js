@@ -46,6 +46,7 @@
       type: partial.type,
       ph: partial.ph == null ? null : partial.ph,
       visual: partial.visual,
+      safety: partial.safety || "",
       conserve: partial.equation ? "Los átomos cuadran a ambos lados: la masa se conserva." : ""
     };
   }
@@ -487,6 +488,328 @@
     var found = REACTIONS[keyOf(idA, idB)];
     var res = found ? applyHeat(found, heated, [idA, idB]) : applyHeat(fallback(idA, idB), heated, [idA, idB]);
     return applyIndicator(res, indicator);
+  };
+
+  AQ.TRAY = [
+    { title: "Líquidos", ids: ["agua", "hcl", "naoh", "vinagre", "etanol", "aceite", "h2o2"] },
+    { title: "Sólidos", ids: ["bicarbonato", "nacl", "caco3", "cuso4", "agno3", "almidon", "yodo", "papa"] }
+  ];
+
+  AQ.DROPS = { id: "feno", name: "Fenolftaleína", formula: "indicador", color: "#f8d0e0" };
+
+  var ELEMENT_REAGENT = { Mg: "magnesio", Zn: "zinc", Fe: "hierro", Cu: "cobre", C: "carbon" };
+  var BLOCKED = { F: 1, Cl: 1, Br: 1, P: 1, As: 1, Se: 1 };
+
+  function asReagent(token) {
+    if (AQ.REAGENTS[token]) return token;
+    if (ELEMENT_REAGENT[token]) return ELEMENT_REAGENT[token];
+    return null;
+  }
+
+  function pieceName(token) {
+    var el = AQ.elementBySymbol(token);
+    if (el) return el.name;
+    if (token === "feno") return "Fenolftaleína";
+    if (AQ.REAGENTS[token]) return AQ.REAGENTS[token].name;
+    return token;
+  }
+
+  function scoreResult(res) {
+    if (!res) return 0;
+    if (res.equation) return 5;
+    if (res.type === "Sin cambio químico" || res.type === "Mezcla" || res.type === "En el vaso" || res.type === "Sin ensayo") return 1;
+    if (res.type === "Disolución") return 2;
+    return 3;
+  }
+
+  function describeOne(token, indicator) {
+    if (token === "feno") {
+      return result({
+        title: "Gotas de fenolftaleína",
+        observation: "Caen unas gotas incoloras. Todavía no hay nada que teñir.",
+        explanation: "Echa un ácido o una base para ver el color.",
+        type: "En el vaso",
+        ph: null,
+        visual: beaker({ liquid: "#f7f4f6", level: 0.35 })
+      });
+    }
+    var el = AQ.elementBySymbol(token);
+    if (el) {
+      var visual = el.state === "gas"
+        ? beaker({ liquid: "#eaf3fb", level: 0.72, gas: el.symbol === "H" ? "H₂" : el.symbol === "O" ? "O₂" : el.symbol === "N" ? "N₂" : el.symbol })
+        : beaker({ liquid: "transparent", level: 0.12, solid: el.look });
+      var res = result({
+        title: el.name + " en el vaso",
+        observation: "Has echado " + el.name.toLowerCase() + ". A temperatura ambiente es " + el.state + ".",
+        explanation: "Sigue siendo el mismo elemento. Echa otro elemento, o algo de la bandeja, para ver si pasa algo.",
+        type: "En el vaso",
+        ph: null,
+        visual: visual
+      });
+      return indicator ? applyIndicator(res, true) : res;
+    }
+    var reagent = AQ.REAGENTS[token];
+    var alone = result({
+      title: reagent.name + " en el vaso",
+      observation: reagent.blurb,
+      explanation: "Echa un elemento u otra cosa encima.",
+      type: "En el vaso",
+      ph: reagent.ph,
+      visual: reagent.metal || (reagent.powder && !reagent.soluble)
+        ? beaker({ liquid: "transparent", level: 0.12, solid: reagent.color })
+        : beaker({ liquid: reagent.color, level: 0.55 })
+    });
+    return applyIndicator(alone, indicator);
+  }
+
+  function alkaliWater(el) {
+    var flame = { Li: "", Na: "#ffe14a", K: "#d7a0ff" }[el.symbol];
+    var how = {
+      Li: "Reacciona y suelta hidrógeno, menos fuerte que el sodio.",
+      Na: "El trozo se mueve por la superficie y el hidrógeno puede encenderse.",
+      K: "La reacción es más rápida y el hidrógeno se enciende enseguida."
+    }[el.symbol];
+    return result({
+      title: el.name + " con agua",
+      observation: how + " La disolución queda básica.",
+      explanation: "El metal cede con facilidad su electrón externo.",
+      equation: "2" + el.symbol + " + 2H₂O → 2" + el.symbol + "OH + H₂",
+      type: "Desplazamiento",
+      ph: 13,
+      safety: "Si en clase se enseña, lo hace el docente con un trozo mínimo. Aquí no hay cantidades ni forma de prepararlo.",
+      visual: beaker({ liquid: "#e7eef2", level: 0.62, bubbles: el.symbol === "Li" ? 2 : 3, gas: "H₂", flame: flame })
+    });
+  }
+
+  function elementPair(a, b) {
+    var tokens = [a, b];
+    function has(id) { return tokens.indexOf(id) >= 0; }
+    var alkali = ["Li", "Na", "K"].filter(has)[0];
+    if (alkali && (has("hcl") || has("vinagre"))) {
+      return result({
+        title: "Eso no se echa junto",
+        observation: "Un metal alcalino y un ácido no entran en este vaso.",
+        explanation: "La reacción sería violenta. En secundaria no se hace, y la simulación se para.",
+        type: "Sin ensayo",
+        ph: null,
+        safety: "Quita uno de los dos para seguir.",
+        visual: { vessel: "gasjar", tint: "#fff1f0", label: "!" }
+      });
+    }
+    if (alkali && has("agua")) return alkaliWater(AQ.elementBySymbol(alkali));
+    if (has("Ca") && has("agua")) {
+      return result({
+        title: "Calcio en agua",
+        observation: "Salen burbujas y el agua se enturbia.",
+        explanation: "Se forma hidróxido de calcio, poco soluble, e hidrógeno.",
+        equation: "Ca + 2H₂O → Ca(OH)₂ + H₂",
+        type: "Desplazamiento",
+        ph: 12,
+        visual: beaker({ liquid: "#e7eef2", bubbles: 2, gas: "H₂", precipitate: "#f4f7fb" })
+      });
+    }
+    if (has("Al") && has("hcl")) {
+      return result({
+        title: "El aluminio suelta hidrógeno",
+        observation: "Tras un momento aparecen burbujas.",
+        explanation: "El ácido atraviesa la capa de óxido y el metal reacciona.",
+        equation: "2Al + 6HCl → 2AlCl₃ + 3H₂",
+        type: "Desplazamiento simple",
+        ph: 1,
+        visual: beaker({ liquid: "#e7f0c8", bubbles: 2, gas: "H₂", solid: "#dfe3e6" })
+      });
+    }
+    if (has("Al") && has("naoh")) {
+      return result({
+        title: "El aluminio también reacciona con la base",
+        observation: "El metal se consume y hay burbujas.",
+        explanation: "Es anfótero: reacciona con ácidos y con bases fuertes.",
+        equation: "2Al + 2NaOH + 2H₂O → 2NaAlO₂ + 3H₂",
+        type: "Reacción de un metal anfótero",
+        ph: 13,
+        visual: beaker({ liquid: "#f4f0e6", bubbles: 2, gas: "H₂" })
+      });
+    }
+    if (has("Mn") && has("hcl")) {
+      return result({
+        title: "El manganeso suelta hidrógeno",
+        observation: "Aparecen burbujas sobre el metal.",
+        explanation: "Está por encima del hidrógeno en la serie de actividad.",
+        equation: "Mn + 2HCl → MnCl₂ + H₂",
+        type: "Desplazamiento simple",
+        ph: 1,
+        visual: beaker({ liquid: "#e7f0c8", bubbles: 2, gas: "H₂", solid: "#b9b3ae" })
+      });
+    }
+    if (has("Be") && (has("hcl") || has("vinagre") || has("naoh"))) {
+      return result({
+        title: "El berilio no se mezcla aquí",
+        observation: "El trozo se queda en el vaso y no seguimos la reacción.",
+        explanation: "Sus compuestos son tóxicos. En secundaria basta con verlo en la tabla.",
+        type: "Sin ensayo",
+        safety: "Mejor quítalo y prueba otro metal.",
+        ph: null,
+        visual: beaker({ liquid: "transparent", level: 0.2, solid: "#d5d8dc" })
+      });
+    }
+    if (has("Fe") && has("O")) {
+      return result({
+        title: "Hierro y oxígeno",
+        observation: "No aparece herrumbre.",
+        explanation: "El óxido anaranjado pide también agua, y tiempo. Echa agua al vaso si quieres verlo.",
+        type: "Sin cambio químico",
+        ph: null,
+        visual: beaker({ liquid: "transparent", level: 0.16, solid: "#8e98a3", gas: "O₂" })
+      });
+    }
+    if (has("H") && has("O")) {
+      return result({
+        title: "Siguen siendo dos gases",
+        observation: "El hidrógeno y el oxígeno comparten el vaso y no se convierten en agua.",
+        explanation: "Hace falta una chispa para que reaccionen. Este vaso no enciende nada.",
+        type: "Sin cambio químico",
+        ph: null,
+        visual: beaker({ liquid: "#eaf3fb", level: 0.72, gas: "H₂ y O₂" })
+      });
+    }
+    if (has("Na") && has("Cl") || has("K") && has("Cl") || has("Li") && has("Cl")) {
+      return result({
+        title: "No aparece la sal",
+        observation: "Juntar el metal y el cloro en el vaso no fabrica sal de mesa.",
+        explanation: "La sal que usas en casa ya es un compuesto. Aquí el cloro ni siquiera se echa: esta pareja no está disponible.",
+        type: "Sin cambio químico",
+        ph: null,
+        visual: beaker({ liquid: "transparent", level: 0.15 })
+      });
+    }
+    var leftEl = AQ.elementBySymbol(a);
+    var rightEl = AQ.elementBySymbol(b);
+    var el = leftEl || rightEl;
+    var other = leftEl ? b : a;
+    if (el && other === "agua") {
+      if (el.state === "gas") {
+        return result({
+          title: el.name + " sobre el agua",
+          observation: "El gas casi no se disuelve y no hay una reacción visible.",
+          explanation: "Siguen siendo las dos sustancias.",
+          type: "Sin cambio químico",
+          ph: 7,
+          visual: beaker({ liquid: "#d5e6ef", level: 0.55, gas: el.symbol })
+        });
+      }
+      return result({
+        title: el.name + " en el agua",
+        observation: "Se queda en el fondo. No hay burbujas ni un producto nuevo.",
+        explanation: "A temperatura ambiente este elemento no reacciona con el agua.",
+        type: "Mezcla",
+        ph: 7,
+        visual: beaker({ liquid: "#d5e6ef", solid: el.look })
+      });
+    }
+    if (el && AQ.REAGENTS[other]) {
+      var liquid = AQ.REAGENTS[other];
+      return result({
+        title: "Sin reacción visible",
+        observation: el.name + " y " + liquid.name.toLowerCase() + " siguen en el vaso, cada uno por su lado.",
+        explanation: "No se forma una sustancia nueva.",
+        type: "Sin cambio químico",
+        ph: liquid.ph,
+        visual: beaker({ liquid: liquid.color || "#d5e6ef", solid: el.state === "sólido" ? el.look : "", gas: el.state === "gas" ? el.symbol : "" })
+      });
+    }
+    if (leftEl && rightEl) {
+      var gasOne = leftEl.state === "gas" ? leftEl : rightEl.state === "gas" ? rightEl : null;
+      var solidOne = leftEl.state !== "gas" ? leftEl : rightEl;
+      return result({
+        title: "Comparten el vaso",
+        observation: leftEl.name + " y " + rightEl.name.toLowerCase() + " no reaccionan solo por estar juntos.",
+        explanation: "A temperatura ambiente no aparece una sustancia nueva.",
+        type: "Sin cambio químico",
+        ph: null,
+        visual: gasOne && solidOne.state !== "gas"
+          ? beaker({ liquid: "transparent", level: 0.16, solid: solidOne.look, gas: gasOne.symbol })
+          : beaker({ liquid: leftEl.state === "gas" ? "#eaf3fb" : "transparent", level: leftEl.state === "gas" ? 0.7 : 0.16, solid: leftEl.state !== "gas" ? leftEl.look : rightEl.look, gas: gasOne ? gasOne.symbol : "" })
+      });
+    }
+    return result({
+      title: "Sin reacción visible",
+      observation: "Lo que echaste sigue en el vaso.",
+      explanation: "No se forma una sustancia nueva.",
+      type: "Sin cambio químico",
+      ph: null,
+      visual: beaker({ liquid: "#d5e6ef", level: 0.4 })
+    });
+  }
+
+  function pairOf(a, b, indicator) {
+    var ra = asReagent(a);
+    var rb = asReagent(b);
+    if (ra && rb) return AQ.mix(ra, rb, false, indicator);
+    if (ra && AQ.REAGENTS[b]) return AQ.mix(ra, b, false, indicator);
+    if (rb && AQ.REAGENTS[a]) return AQ.mix(a, rb, false, indicator);
+    var raw = elementPair(a, b);
+    return applyIndicator(raw, indicator);
+  }
+
+  AQ.pieceName = pieceName;
+
+  AQ.observeBeaker = function (tokens) {
+    if (!tokens.length) {
+      return result({
+        title: "Vaso vacío",
+        observation: "Selecciona un elemento de la tabla y échalo aquí.",
+        explanation: "Después puedes echar otro elemento, o un líquido o un sólido de la bandeja.",
+        type: "En el vaso",
+        ph: null,
+        visual: beaker({ liquid: "transparent", level: 0.08 })
+      });
+    }
+    var blocked = tokens.filter(function (token) { return BLOCKED[token]; })[0];
+    if (blocked) {
+      var danger = AQ.elementBySymbol(blocked);
+      return result({
+        title: danger.name + " no entra en el vaso",
+        observation: "Ese elemento no se manipula en un laboratorio de secundaria.",
+        explanation: danger.about,
+        type: "Sin ensayo",
+        safety: "Quítalo para seguir echando otras cosas.",
+        ph: null,
+        visual: { vessel: "gasjar", tint: "#fff6ea", label: danger.symbol }
+      });
+    }
+    var indicator = tokens.indexOf("feno") >= 0;
+    var items = tokens.filter(function (token) { return token !== "feno"; });
+    if (!items.length) return describeOne("feno", false);
+    if (items.indexOf("Fe") >= 0 && items.indexOf("O") >= 0 && items.indexOf("agua") >= 0) {
+      return applyIndicator(result({
+        title: "Empieza la herrumbre",
+        observation: "Con hierro, oxígeno y agua aparecen manchas naranjas.",
+        explanation: "La herrumbre es un óxido hidratado. Se forma despacio.",
+        equation: "4Fe + 3O₂ + agua → herrumbre",
+        type: "Síntesis",
+        ph: 7,
+        visual: beaker({ liquid: "#d5e6ef", level: 0.55, solid: "#c4622d" })
+      }), indicator);
+    }
+    if (items.length === 1) return describeOne(items[0], indicator);
+    var best = null;
+    var bestScore = -1;
+    for (var i = 0; i < items.length; i++) {
+      for (var j = i + 1; j < items.length; j++) {
+        var candidate = pairOf(items[i], items[j], indicator);
+        var value = scoreResult(candidate);
+        if (i === items.length - 1 || j === items.length - 1) value += 0.2;
+        if (value > bestScore) {
+          best = candidate;
+          bestScore = value;
+        }
+      }
+    }
+    if (items.length > 2 && best) {
+      best = Object.assign({}, best);
+      best.explanation = best.explanation + " Lo demás que echaste sigue en el vaso.";
+    }
+    return best;
   };
 
   AQ.MATTER = [
